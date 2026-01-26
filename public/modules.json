@@ -5,8 +5,8 @@
     "coreRequiredYear": 8,
     "advRequiredSemester": 4,
     "advRequiredYear": 8,
-    "coreCompleted": 3,
-    "advCompleted": 2,
+    "coreCompleted": 0,
+    "advCompleted": 0,
     "semesterGrade": 5,
     "yearGrade": 5,
     "tasks": [
@@ -398,8 +398,8 @@
     "coreRequiredYear": 9,
     "advRequiredSemester": 4,
     "advRequiredYear": 8,
-    "coreCompleted": 5,
-    "advCompleted": 1,
+    "coreCompleted": 0,
+    "advCompleted": 0,
     "semesterGrade": 5,
     "yearGrade": 5,
     "tasks": [
@@ -561,8 +561,8 @@
     "coreRequiredYear": 5,
     "advRequiredSemester": 4,
     "advRequiredYear": 8,
-    "coreCompleted": 4,
-    "advCompleted": 1,
+    "coreCompleted": 0,
+    "advCompleted": 0,
     "semesterGrade": 5,
     "yearGrade": 5,
     "tasks": [
