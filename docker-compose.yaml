@@ -5,3 +5,5 @@ services:
       dockerfile: Dockerfile
     ports:
       - "80:3000"
+    volumes:
+      - ./public/modules.json:/app/public/modules.json
