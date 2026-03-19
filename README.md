@@ -22,7 +22,5 @@ docker compose down
 > This deletes all progress
 
 ```bash
-docker compose down
-docker volume rm module_progress_db_data
-docker image rm module-progress
+docker compose down -v
 ```
