@@ -5,8 +5,9 @@
 ```bash
 docker compose up -d --build
 ```
-
-> Then import the `modules.json` file
+> The website is now available at [localhost:3000](http://localhost:3000)
+> 
+> Then import the [modules.json](/modules.json) file via the `Import` Button
 
 ### Stop
 
