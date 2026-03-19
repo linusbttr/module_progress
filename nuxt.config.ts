@@ -18,4 +18,7 @@ export default defineNuxtConfig({
         // node:sqlite needs the experimental flag in Node 22; Node 24+ it's stable.
         // The flag is passed via NODE_OPTIONS in package.json scripts and Dockerfile.
     },
+    typescript: {
+        typeCheck: false,
+    },
 })

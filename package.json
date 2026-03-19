@@ -6,7 +6,7 @@
     "node": ">=22.5.0"
   },
   "scripts": {
-    "build": "nuxt build",
+    "build": "nuxt prepare && nuxt build",
     "dev": "NODE_OPTIONS=--experimental-sqlite nuxt dev",
     "generate": "nuxt generate",
     "preview": "NODE_OPTIONS=--experimental-sqlite node .output/server/index.mjs",
