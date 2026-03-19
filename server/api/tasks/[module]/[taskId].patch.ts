@@ -1,4 +1,4 @@
-import {getDb} from '~/server/utils/db'
+import {getDb} from '#server/utils/db'
 
 const ALLOWED_FIELDS = ['code', 'interview', 'quiz'] as const
 type Field = (typeof ALLOWED_FIELDS)[number]

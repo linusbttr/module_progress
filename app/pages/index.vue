@@ -1,6 +1,4 @@
 <script lang="ts" setup>
-import {useFetch} from "nuxt/app"
-import {ref} from "vue"
 import type {SubjectModule, CheckboxField} from '~/types'
 
 const {data: modules, refresh} = await useFetch<SubjectModule[]>('/api/modules')

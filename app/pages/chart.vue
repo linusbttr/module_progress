@@ -1,6 +1,4 @@
-<script lang="ts" setup>
-import {useFetch} from "nuxt/app"
-import {computed} from "vue"
+<script setup lang="ts">
 import type {SubjectModule} from '~/types'
 
 const {data: modules} = await useFetch<SubjectModule[]>('/api/modules')
@@ -65,11 +63,11 @@ const enriched = computed(() =>
             <div class="card-head">
                 <h2>{{ m.name }}</h2>
                 <div class="grade-row">
-                    <div :class="`grade-${m.semesterGrade}`" class="grade-chip">
+                    <div class="grade-chip" :class="`grade-${m.semesterGrade}`">
                         <span class="grade-label">Semester</span>
                         <span class="grade-value">{{ m.semesterGrade }}</span>
                     </div>
-                    <div :class="`grade-${m.yearGrade}`" class="grade-chip">
+                    <div class="grade-chip" :class="`grade-${m.yearGrade}`">
                         <span class="grade-label">Year</span>
                         <span class="grade-value">{{ m.yearGrade }}</span>
                     </div>
@@ -118,8 +116,8 @@ const enriched = computed(() =>
                         <div class="chart-item">
                             <div class="donut-container">
                                 <DonutChart
-                                    :colors="['#7c5cbf', '#2e2e2e']"
                                     :values="[m.advCompleted, Math.max(0, m.advRequiredSemester - m.advCompleted)]"
+                                    :colors="['#7c5cbf', '#2e2e2e']"
                                 />
                                 <div class="donut-center">
                                     <span class="center-count" style="color:#9b7de0">{{ m.advCompleted }}</span>
@@ -131,8 +129,8 @@ const enriched = computed(() =>
                         <div class="chart-item">
                             <div class="donut-container">
                                 <DonutChart
-                                    :colors="['#7c5cbf', '#2e2e2e']"
                                     :values="[m.advCompleted, Math.max(0, m.advRequiredYear - m.advCompleted)]"
+                                    :colors="['#7c5cbf', '#2e2e2e']"
                                 />
                                 <div class="donut-center">
                                     <span class="center-count" style="color:#9b7de0">{{ m.advCompleted }}</span>
@@ -149,8 +147,8 @@ const enriched = computed(() =>
             <div class="task-summary">
                 <div class="summary-bar">
                     <div
-                        :style="{ width: `${m.coreTasks ? (m.coreCompleted / m.coreTasks) * 100 : 0}%` }"
                         class="bar-fill core-fill"
+                        :style="{ width: `${m.coreTasks ? (m.coreCompleted / m.coreTasks) * 100 : 0}%` }"
                     />
                 </div>
                 <span class="summary-text">{{ m.coreCompleted }}/{{ m.coreTasks }} Core · {{

@@ -1,5 +1,5 @@
-import {getDb} from '~/server/utils/db'
-import {importData} from '~/server/utils/db'
+import {getDb} from '../utils/db'
+import {importData} from '../utils/db'
 
 export default defineEventHandler(async (event) => {
     const body = await readBody(event)

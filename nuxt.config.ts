@@ -1,10 +1,10 @@
-import {defineNuxtConfig} from "nuxt/config";
-
 export default defineNuxtConfig({
     compatibilityDate: '2025-07-15',
     devtools: {enabled: true},
 
     srcDir: 'app/',
+    serverDir: 'server/',
+
     css: ['~/css/global.css'],
 
     app: {
@@ -14,11 +14,10 @@ export default defineNuxtConfig({
         },
     },
 
-    nitro: {
-        // node:sqlite needs the experimental flag in Node 22; Node 24+ it's stable.
-        // The flag is passed via NODE_OPTIONS in package.json scripts and Dockerfile.
-    },
     typescript: {
+        // Verhindert dass Vite tsconfig.app.json liest bevor Nuxt es generiert hat
         typeCheck: false,
     },
+
+    nitro: {},
 })

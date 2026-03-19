@@ -1,4 +1,4 @@
-import {getDb} from '~/server/utils/db'
+import {getDb} from '../utils/db'
 
 export default defineEventHandler((event) => {
     const db = getDb()
