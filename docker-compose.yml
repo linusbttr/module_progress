@@ -1,0 +1,27 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: module-progress:latest
+    container_name: module-progress
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - db_data:/data
+    environment:
+      NODE_ENV: production
+      DATA_DIR: /data
+      PORT: "3000"
+      HOST: "0.0.0.0"
+    healthcheck:
+      test: [ "CMD", "wget", "-qO-", "http://localhost:3000/api/modules" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  db_data:
+    driver: local
