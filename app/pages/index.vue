@@ -2,8 +2,37 @@
 import type {SubjectModule, CheckboxField} from '~/types'
 
 const {data: modules, refresh} = await useFetch<SubjectModule[]>('/api/modules')
+const saving = ref<string | null>(null)
 
-const saving = ref<string | null>(null) // 'moduleName:taskId'
+async function toggle(module: SubjectModule, taskId: number, field: CheckboxField) {
+    const key = `${module.name}:${taskId}`
+    saving.value = key
+    const task = module.tasks.find(t => t.id === taskId)!
+    const newValue = !task[field]
+
+    // Optimistic update
+    const wasCompleted = task.completed
+    task[field] = newValue
+    task.completed = task.code && task.interview && task.quiz
+    if (!wasCompleted && task.completed) {
+        if (task.type === 'CORE') module.coreCompleted++
+        else module.advCompleted++
+    } else if (wasCompleted && !task.completed) {
+        if (task.type === 'CORE') module.coreCompleted--
+        else module.advCompleted--
+    }
+
+    try {
+        await $fetch(`/api/tasks/${module.name}/${taskId}`, {
+            method: 'PATCH',
+            body: {field, value: newValue},
+        })
+    } catch {
+        await refresh()
+    } finally {
+        saving.value = null
+    }
+}
 
 function gradeLabel(subject: string, coreCompleted: number, advCompleted: number, period: 'semester' | 'year') {
     let grade = 5
@@ -35,309 +64,313 @@ function gradeLabel(subject: string, coreCompleted: number, advCompleted: number
 
     return grade
 }
-
-async function toggle(module: SubjectModule, taskId: number, field: CheckboxField) {
-    if (!modules.value) return
-    const key = `${module.name}:${taskId}`
-    saving.value = key
-
-    const task = module.tasks.find((t) => t.id === taskId)!
-    const newValue = !task[field]
-
-    // Optimistic update
-    task[field] = newValue
-    task.completed = task.code && task.interview && task.quiz
-    if (task.completed) {
-        if (task.type === 'CORE') module.coreCompleted++
-        else module.advCompleted++
-    } else if (!newValue) {
-        // Revert count if it was completed before
-        if (task.type === 'CORE' && module.coreCompleted > 0) module.coreCompleted--
-        else if (task.type === 'ADV' && module.advCompleted > 0) module.advCompleted--
-    }
-
-    try {
-        await $fetch(`/api/tasks/${module.name}/${taskId}`, {
-            method: 'PATCH',
-            body: {field, value: newValue},
-        })
-    } catch {
-        // Revert on error
-        await refresh()
-    } finally {
-        saving.value = null
-    }
-}
 </script>
 
 <template>
-    <section class="grid">
-        <div v-for="m in modules" :key="m.name" class="module-card">
-            <!-- Card Header -->
-            <div class="card-header">
-                <div class="header-top">
-                    <h2>{{ m.name }}</h2>
-                    <div class="grade-badges">
-            <span :class="`grade-${gradeLabel(m.name, m.coreCompleted, m.advCompleted, 'semester')}`" class="badge">
-              SEM {{ gradeLabel(m.name, m.coreCompleted, m.advCompleted, 'semester') }}
-            </span>
+    <div class="columns">
+        <div v-for="m in modules" :key="m.name" class="column">
+
+            <!-- Subject header -->
+            <div class="subject-header">
+                <div class="subject-title">
+                    <span class="subject-name">{{ m.name }}</span>
+                    <span class="subject-counts">
+                        <span :class="`grade-${gradeLabel(m.name, m.coreCompleted, m.advCompleted, 'semester')}`"
+                              class="badge count-chip">
+                            SEM {{ gradeLabel(m.name, m.coreCompleted, m.advCompleted, 'semester') }}
+                        </span>
                         <span :class="`grade-${gradeLabel(m.name, m.coreCompleted, m.advCompleted, 'year')}`"
-                              class="badge">
-              YEAR {{ gradeLabel(m.name, m.coreCompleted, m.advCompleted, 'year') }}
-            </span>
-                    </div>
+                              class="badge count-chip">
+                            YEAR {{ gradeLabel(m.name, m.coreCompleted, m.advCompleted, 'year') }}
+                        </span>
+                        <span class="count-chip core">{{ m.coreCompleted }}/{{
+                                m.tasks.filter(t => t.type === 'CORE').length
+                            }} core</span>
+                        <span class="count-chip adv">{{ m.advCompleted }}/{{
+                                m.tasks.filter(t => t.type === 'ADV').length
+                            }} adv</span>
+                      </span>
                 </div>
-                <div class="progress-row">
-                    <span class="progress-label">CORE {{
-                            m.coreCompleted
-                        }} / {{ m.tasks.filter(t => t.type === 'CORE').length }}</span>
-                    <span class="progress-label">ADV {{
-                            m.advCompleted
-                        }} / {{ m.tasks.filter(t => t.type === 'ADV').length }}</span>
+
+                <!-- Progress bar -->
+                <div class="progress-track">
+                    <div
+                        :style="{ width: `${(m.tasks.filter(t=>t.completed).length / m.tasks.length) * 100}%` }"
+                        class="progress-fill"
+                    />
                 </div>
             </div>
 
-            <!-- Column labels -->
-            <div class="task-row header-row">
-                <span class="task-type"/>
-                <span class="task-title"/>
-                <div class="task-checks">
-                    <span>Code</span>
-                    <span>Interview</span>
-                    <span>Quiz</span>
-                </div>
+            <!-- Check header -->
+            <div class="check-header">
+                <span/>
+                <span class="check-labels">
+          <span>C</span><span>I</span><span>Q</span>
+        </span>
             </div>
 
-            <!-- Tasks grouped by type -->
+            <!-- Task groups -->
             <template v-for="group in ['CORE', 'ADV']" :key="group">
-                <div class="group-divider">{{ group }}</div>
+                <div class="group-label">{{ group }}</div>
                 <div
                     v-for="task in m.tasks.filter(t => t.type === group)"
                     :key="task.id"
-                    :class="{ completed: task.completed, saving: saving === `${m.name}:${task.id}` }"
-                    class="task-row"
+                    :class="{ done: task.completed, saving: saving === `${m.name}:${task.id}` }"
+                    class="task"
                 >
-                    <span class="task-num">{{ task.number || '—' }}</span>
-                    <span class="task-title">{{ task.title }}</span>
+                    <div class="task-left">
+                        <span class="task-num">{{ task.number || '—' }}</span>
+                        <span class="task-title">{{ task.title }}</span>
+                    </div>
                     <div class="task-checks">
-                        <label class="check-wrap" title="Code">
+                        <label
+                            v-for="field in (['code', 'interview', 'quiz'] as CheckboxField[])"
+                            :key="field"
+                            :class="{ checked: task[field] }"
+                            class="cb"
+                        >
                             <input
-                                :checked="task.code"
+                                :checked="task[field]"
                                 :disabled="saving === `${m.name}:${task.id}`"
                                 type="checkbox"
-                                @change="toggle(m, task.id, 'code')"
+                                @change="toggle(m, task.id, field)"
                             />
-                        </label>
-                        <label class="check-wrap" title="Interview">
-                            <input
-                                :checked="task.interview"
-                                :disabled="saving === `${m.name}:${task.id}`"
-                                type="checkbox"
-                                @change="toggle(m, task.id, 'interview')"
-                            />
-                        </label>
-                        <label class="check-wrap" title="Quiz">
-                            <input
-                                :checked="task.quiz"
-                                :disabled="saving === `${m.name}:${task.id}`"
-                                type="checkbox"
-                                @change="toggle(m, task.id, 'quiz')"
-                            />
+                            <span class="cb-box">
+                <svg v-if="task[field]" fill="none" height="7" viewBox="0 0 9 7" width="9">
+                  <path d="M1 3.5L3.5 6L8 1" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                        stroke-width="1.5"/>
+                </svg>
+              </span>
                         </label>
                     </div>
                 </div>
             </template>
+
         </div>
-    </section>
+    </div>
 </template>
 
 <style scoped>
-/* ── Layout ─────────────────────────────────────────────────── */
-.grid {
-    display: flex;
-    gap: 20px;
-    align-items: flex-start;
+.columns {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    align-items: start;
 }
 
 @media (max-width: 1100px) {
-    .grid {
-        flex-direction: column;
+    .columns {
+        grid-template-columns: 1fr 1fr;
     }
 }
 
-/* ── Card ───────────────────────────────────────────────────── */
-.module-card {
-    flex: 1;
-    min-width: 0;
-    background: #242424;
-    border: 1px solid #2e2e2e;
-    border-radius: 10px;
+@media (max-width: 700px) {
+    .columns {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ── Card ───────────────────────────────────────────────── */
+.column {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
     overflow: hidden;
 }
 
-/* ── Card Header ────────────────────────────────────────────── */
-.card-header {
-    padding: 16px 18px 10px;
-    border-bottom: 1px solid #2e2e2e;
+/* ── Subject header ─────────────────────────────────────── */
+.subject-header {
+    padding: 16px 16px 12px;
+    border-bottom: 1px solid var(--border);
 }
 
-.header-top {
+.subject-title {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
 }
 
-h2 {
-    font-size: 18px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
+.subject-name {
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
 }
 
-.grade-badges {
+.subject-counts {
     display: flex;
     gap: 6px;
 }
 
-.badge {
+.count-chip {
+    font-family: var(--font-mono);
     font-size: 10px;
-    font-weight: 700;
-    padding: 3px 7px;
-    border-radius: 4px;
-    letter-spacing: 0.5px;
-    background: #2d2d2d;
-    color: #999;
-}
-
-.grade-1 {
-    background: #1a3a1a;
-    color: #6fcf6f;
-}
-
-.grade-2 {
-    background: #1a2e1a;
-    color: #5abf5a;
-}
-
-.grade-3 {
-    background: #2a2a1a;
-    color: #cfcf50;
-}
-
-.grade-4 {
-    background: #3a2a1a;
-    color: #cf8f30;
-}
-
-.grade-5 {
-    background: #3a1a1a;
-    color: #cf5050;
-}
-
-.progress-row {
-    display: flex;
-    gap: 14px;
-}
-
-.progress-label {
-    font-size: 11px;
-    color: #666;
+    padding: 2px 7px;
+    border-radius: 3px;
     font-weight: 500;
 }
 
-/* ── Column headers ─────────────────────────────────────────── */
-.header-row {
-    padding: 6px 12px 6px 18px !important;
-    background: #1e1e1e;
-    border-bottom: 1px solid #2a2a2a;
-    opacity: 1 !important;
+.count-chip.core {
+    background: #1a0f07;
+    color: var(--accent);
+    border: 1px solid var(--accent-dim);
 }
 
-.header-row .task-checks span {
-    font-size: 10px;
-    font-weight: 600;
-    color: #555;
-    letter-spacing: 0.4px;
-    text-transform: uppercase;
-    width: 60px;
-    text-align: center;
+.count-chip.adv {
+    background: #0d1a2a;
+    color: #60a5fa;
+    border: 1px solid #1e3a5a;
 }
 
-/* ── Group divider ──────────────────────────────────────────── */
-.group-divider {
-    padding: 4px 18px;
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    color: #444;
-    background: #1e1e1e;
-    border-bottom: 1px solid #2a2a2a;
+.progress-track {
+    height: 2px;
+    background: var(--border-hi);
+    border-radius: 1px;
+    overflow: hidden;
 }
 
-/* ── Task rows ──────────────────────────────────────────────── */
-.task-row {
+.progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 1px;
+    transition: width 0.4s ease;
+}
+
+/* ── Check header ───────────────────────────────────────── */
+.check-header {
     display: flex;
     align-items: center;
-    padding: 9px 12px 9px 18px;
-    border-bottom: 1px solid #2a2a2a;
-    gap: 8px;
-    transition: background 0.1s, opacity 0.2s;
+    justify-content: space-between;
+    padding: 6px 16px;
+    background: var(--faint);
+    border-bottom: 1px solid var(--border);
 }
 
-.task-row:last-child {
-    border-bottom: none;
-}
-
-.task-row:hover:not(.header-row) {
-    background: #282828;
-}
-
-.task-row.completed {
-    opacity: 0.25;
-}
-
-.task-row.saving {
-    opacity: 0.6;
-}
-
-.task-num {
-    font-size: 11px;
-    color: #555;
-    min-width: 24px;
-    font-variant-numeric: tabular-nums;
-}
-
-.task-title {
-    flex: 1;
-    font-size: 13px;
-    color: #ccc;
-    line-height: 1.4;
-}
-
-/* ── Checkboxes ─────────────────────────────────────────────── */
-.task-checks {
+.check-labels {
     display: flex;
     gap: 0;
 }
 
-.check-wrap {
+.check-labels span {
+    width: 32px;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    text-transform: uppercase;
+}
+
+/* ── Group label ────────────────────────────────────────── */
+.group-label {
+    padding: 5px 16px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text);
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+}
+
+/* ── Task row ───────────────────────────────────────────── */
+.task {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 9px 16px;
+    border-bottom: 1px solid var(--border);
+    gap: 8px;
+    transition: background 0.1s, opacity 0.2s;
+}
+
+.task:last-child {
+    border-bottom: none;
+}
+
+.task:hover {
+    background: var(--faint);
+}
+
+.task.done {
+    background: var(--accent-dim);
+    opacity: 0.88;
+}
+
+.task.saving {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.task-left {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.task-num {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text);
+    flex-shrink: 0;
+    width: 18px;
+}
+
+.task-title {
+    font-size: 12px;
+    color: var(--text);
+    line-height: 1.4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── Custom checkboxes ──────────────────────────────────── */
+.task-checks {
+    display: flex;
+    flex-shrink: 0;
+}
+
+.cb {
+    width: 32px;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 60px;
     cursor: pointer;
 }
 
-.check-wrap input[type='checkbox'] {
+.cb input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+}
+
+.cb-box {
     width: 16px;
     height: 16px;
-    accent-color: #e46b09;
-    cursor: pointer;
+    border-radius: 4px;
+    border: 1px solid var(--border-hi);
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent);
+    transition: border-color 0.15s, background 0.15s;
 }
 
-.check-wrap input:disabled {
-    cursor: not-allowed;
-    opacity: 0.5;
+.cb:hover .cb-box {
+    border-color: var(--muted);
+}
+
+.cb.checked .cb-box {
+    background: #1a0f07;
+    border-color: var(--accent);
 }
 </style>

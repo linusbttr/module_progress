@@ -1,295 +1,277 @@
-<script setup lang="ts">
+<script lang="ts" setup>
 import type {SubjectModule} from '~/types'
 
 const {data: modules} = await useFetch<SubjectModule[]>('/api/modules')
 
-function calculateGrades(subject: string, coreCompleted: number, advCompleted: number): [number, number] {
-    let semesterGrade = 5
-    let yearGrade = 5
-
-    switch (subject) {
+function calcGrades(name: string, core: number, adv: number): [number, number] {
+    let s = 5, y = 5
+    switch (name) {
         case 'WEBT':
-            if (coreCompleted >= 4) {
-                semesterGrade = 4
-                if (advCompleted >= 1) semesterGrade = 3
-                if (advCompleted >= 2) semesterGrade = 2
-                if (advCompleted >= 4) semesterGrade = 1
+            if (core >= 4) {
+                s = 4;
+                if (adv >= 1) s = 3;
+                if (adv >= 2) s = 2;
+                if (adv >= 4) s = 1
             }
-            if (coreCompleted >= 8) {
-                yearGrade = 4
-                if (advCompleted >= 2) yearGrade = 3
-                if (advCompleted >= 4) yearGrade = 2
-                if (advCompleted >= 8) yearGrade = 1
+            if (core >= 8) {
+                y = 4;
+                if (adv >= 2) y = 3;
+                if (adv >= 4) y = 2;
+                if (adv >= 8) y = 1
             }
             break
-
         case 'SEW':
-            if (coreCompleted >= 5) {
-                semesterGrade = Math.max(1, 4 - Math.min(advCompleted, 3))
-            }
-            if (coreCompleted >= 9) {
-                yearGrade = Math.max(1, 4 - Math.floor(advCompleted / 2))
-            }
+            if (core >= 5) s = Math.max(1, 4 - Math.min(adv, 3))
+            if (core >= 9) y = Math.max(1, 4 - Math.floor(adv / 2))
             break
-
         case 'CMS':
-            if (coreCompleted >= 3) {
-                semesterGrade = Math.max(1, 4 - Math.min(advCompleted, 3))
-            }
-            if (coreCompleted >= 5) {
-                yearGrade = Math.max(1, 4 - Math.floor(advCompleted / 2))
-            }
+            if (core >= 3) s = Math.max(1, 4 - Math.min(adv, 3))
+            if (core >= 5) y = Math.max(1, 4 - Math.floor(adv / 2))
             break
     }
+    return [s, y]
+}
 
-    return [semesterGrade, yearGrade]
+const gradeColor: Record<number, string> = {
+    1: '#22c55e', 2: '#4ade80', 3: '#eab308', 4: '#f97316', 5: '#ef4444'
 }
 
 const enriched = computed(() =>
-    (modules.value ?? []).map((m) => {
-        const [semesterGrade, yearGrade] = calculateGrades(m.name, m.coreCompleted, m.advCompleted)
-        const coreTasks = m.tasks.filter((t) => t.type === 'CORE').length
-        const advTasks = m.tasks.filter((t) => t.type === 'ADV').length
-        return {...m, semesterGrade, yearGrade, coreTasks, advTasks}
-    }),
+    (modules.value ?? []).map(m => {
+        const [sem, year] = calcGrades(m.name, m.coreCompleted, m.advCompleted)
+        const coreTotal = m.tasks.filter(t => t.type === 'CORE').length
+        const advTotal = m.tasks.filter(t => t.type === 'ADV').length
+        const totalDone = m.tasks.filter(t => t.completed).length
+        return {...m, sem, year, coreTotal, advTotal, totalDone}
+    })
 )
 </script>
 
 <template>
     <div class="chart-grid">
-        <div v-for="m in enriched" :key="m.name" class="subject-card">
+        <div v-for="m in enriched" :key="m.name" class="card">
 
             <!-- Header -->
-            <div class="card-head">
-                <h2>{{ m.name }}</h2>
+            <div class="card-top">
+                <span class="card-name">{{ m.name }}</span>
                 <div class="grade-row">
-                    <div class="grade-chip" :class="`grade-${m.semesterGrade}`">
-                        <span class="grade-label">Semester</span>
-                        <span class="grade-value">{{ m.semesterGrade }}</span>
+                    <div class="grade-block">
+                        <span class="grade-period">Semester</span>
+                        <span :style="{ color: gradeColor[m.sem] }" class="grade-value">{{ m.sem }}</span>
                     </div>
-                    <div class="grade-chip" :class="`grade-${m.yearGrade}`">
-                        <span class="grade-label">Year</span>
-                        <span class="grade-value">{{ m.yearGrade }}</span>
+                    <div class="grade-sep"/>
+                    <div class="grade-block">
+                        <span class="grade-period">Year</span>
+                        <span :style="{ color: gradeColor[m.year] }" class="grade-value">{{ m.year }}</span>
                     </div>
                 </div>
             </div>
 
-            <!-- Charts -->
-            <div class="charts-area">
-                <!-- CORE -->
-                <div class="chart-group">
-                    <p class="group-label">CORE</p>
-                    <div class="chart-pair">
-                        <div class="chart-item">
-                            <div class="donut-container">
+            <!-- Donut rows -->
+            <div class="donut-section">
+                <div class="donut-row">
+                    <span class="donut-label">CORE</span>
+                    <div class="donut-pair">
+                        <div class="donut-item">
+                            <div class="donut-wrap">
                                 <DonutChart
-                                    :values="[m.coreCompleted, Math.max(0, m.coreRequiredSemester - m.coreCompleted)]"
-                                />
-                                <div class="donut-center">
-                                    <span class="center-count">{{ m.coreCompleted }}</span>
-                                    <span class="center-total">/{{ m.coreRequiredSemester }}</span>
+                                    :size="80"
+                                    :values="[m.coreCompleted, Math.max(0, m.coreRequiredSemester - m.coreCompleted)]"/>
+                                <div class="donut-text">
+                                    <span class="dt-val">{{ m.coreCompleted }}</span>
+                                    <span class="dt-max">/{{ m.coreRequiredSemester }}</span>
                                 </div>
                             </div>
-                            <p class="chart-label">Semester</p>
+                            <span class="dt-period">SEM</span>
                         </div>
-                        <div class="chart-item">
-                            <div class="donut-container">
+                        <div class="donut-item">
+                            <div class="donut-wrap">
                                 <DonutChart
-                                    :values="[m.coreCompleted, Math.max(0, m.coreRequiredYear - m.coreCompleted)]"
-                                />
-                                <div class="donut-center">
-                                    <span class="center-count">{{ m.coreCompleted }}</span>
-                                    <span class="center-total">/{{ m.coreRequiredYear }}</span>
+                                    :size="80"
+                                    :values="[m.coreCompleted, Math.max(0, m.coreRequiredYear - m.coreCompleted)]"/>
+                                <div class="donut-text">
+                                    <span class="dt-val">{{ m.coreCompleted }}</span>
+                                    <span class="dt-max">/{{ m.coreRequiredYear }}</span>
                                 </div>
                             </div>
-                            <p class="chart-label">Year</p>
+                            <span class="dt-period">YEAR</span>
                         </div>
                     </div>
                 </div>
 
-                <div class="divider"/>
+                <div class="donut-divider"/>
 
-                <!-- ADV -->
-                <div class="chart-group">
-                    <p class="group-label">ADV</p>
-                    <div class="chart-pair">
-                        <div class="chart-item">
-                            <div class="donut-container">
+                <div class="donut-row">
+                    <span class="donut-label">ADV</span>
+                    <div class="donut-pair">
+                        <div class="donut-item">
+                            <div class="donut-wrap">
                                 <DonutChart
-                                    :values="[m.advCompleted, Math.max(0, m.advRequiredSemester - m.advCompleted)]"
-                                    :colors="['#7c5cbf', '#2e2e2e']"
-                                />
-                                <div class="donut-center">
-                                    <span class="center-count" style="color:#9b7de0">{{ m.advCompleted }}</span>
-                                    <span class="center-total">/{{ m.advRequiredSemester }}</span>
+                                    :colors="['#60a5fa','#1e3a5a']"
+                                    :size="80" :values="[m.advCompleted, Math.max(0, m.advRequiredSemester - m.advCompleted)]"/>
+                                <div class="donut-text">
+                                    <span class="dt-val" style="color:#60a5fa">{{ m.advCompleted }}</span>
+                                    <span class="dt-max">/{{ m.advRequiredSemester }}</span>
                                 </div>
                             </div>
-                            <p class="chart-label">Semester</p>
+                            <span class="dt-period">SEM</span>
                         </div>
-                        <div class="chart-item">
-                            <div class="donut-container">
-                                <DonutChart
-                                    :values="[m.advCompleted, Math.max(0, m.advRequiredYear - m.advCompleted)]"
-                                    :colors="['#7c5cbf', '#2e2e2e']"
-                                />
-                                <div class="donut-center">
-                                    <span class="center-count" style="color:#9b7de0">{{ m.advCompleted }}</span>
-                                    <span class="center-total">/{{ m.advRequiredYear }}</span>
+                        <div class="donut-item">
+                            <div class="donut-wrap">
+                                <DonutChart :colors="['#60a5fa','#1e3a5a']"
+                                            :size="80" :values="[m.advCompleted, Math.max(0, m.advRequiredYear - m.advCompleted)]"/>
+                                <div class="donut-text">
+                                    <span class="dt-val" style="color:#60a5fa">{{ m.advCompleted }}</span>
+                                    <span class="dt-max">/{{ m.advRequiredYear }}</span>
                                 </div>
                             </div>
-                            <p class="chart-label">Year</p>
+                            <span class="dt-period">YEAR</span>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Task count bar -->
-            <div class="task-summary">
-                <div class="summary-bar">
-                    <div
-                        class="bar-fill core-fill"
-                        :style="{ width: `${m.coreTasks ? (m.coreCompleted / m.coreTasks) * 100 : 0}%` }"
-                    />
+            <!-- Footer stats -->
+            <div class="card-footer">
+                <div class="stat">
+                    <span class="stat-val">{{ m.totalDone }}</span>
+                    <span class="stat-label">completed</span>
                 </div>
-                <span class="summary-text">{{ m.coreCompleted }}/{{ m.coreTasks }} Core · {{
-                        m.advCompleted
-                    }}/{{ m.advTasks }} Adv</span>
+                <div class="stat">
+                    <span class="stat-val">{{ m.tasks.length - m.totalDone }}</span>
+                    <span class="stat-label">remaining</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-val">{{ Math.round((m.totalDone / m.tasks.length) * 100) }}%</span>
+                    <span class="stat-label">progress</span>
+                </div>
             </div>
+
         </div>
     </div>
 </template>
 
 <style scoped>
 .chart-grid {
-    display: flex;
-    gap: 20px;
-    flex-wrap: wrap;
-    justify-content: center;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    align-items: start;
 }
 
-/* ── Card ─────────────────────────────────────────────────── */
-.subject-card {
-    background: #242424;
-    border: 1px solid #2e2e2e;
-    border-radius: 10px;
-    padding: 20px;
-    min-width: 300px;
-    flex: 1;
-    max-width: 380px;
+@media (max-width: 1000px) {
+    .chart-grid {
+        grid-template-columns: 1fr 1fr;
+    }
 }
 
-/* ── Header ───────────────────────────────────────────────── */
-.card-head {
+@media (max-width: 640px) {
+    .chart-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ── Card ───────────────────────────────────────────────── */
+.card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+/* ── Top ────────────────────────────────────────────────── */
+.card-top {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 20px;
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--border);
 }
 
-h2 {
-    font-size: 20px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
+.card-name {
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
 }
 
 .grade-row {
     display: flex;
-    gap: 8px;
+    align-items: center;
+    gap: 12px;
 }
 
-.grade-chip {
+.grade-block {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 5px 10px;
-    border-radius: 6px;
-    background: #2d2d2d;
-    min-width: 52px;
 }
 
-.grade-label {
+.grade-period {
+    font-family: var(--font-mono);
     font-size: 9px;
-    font-weight: 600;
-    letter-spacing: 0.5px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: #555;
 }
 
 .grade-value {
-    font-size: 18px;
+    font-size: 26px;
     font-weight: 800;
-    line-height: 1.2;
-    color: #888;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+    font-family: var(--font-mono);
 }
 
-.grade-1 .grade-value {
-    color: #6fcf6f;
-}
-
-.grade-2 .grade-value {
-    color: #5abf5a;
-}
-
-.grade-3 .grade-value {
-    color: #cfcf50;
-}
-
-.grade-4 .grade-value {
-    color: #cf8f30;
-}
-
-.grade-5 .grade-value {
-    color: #cf5050;
-}
-
-/* ── Chart layout ─────────────────────────────────────────── */
-.charts-area {
-    display: flex;
-    gap: 16px;
-    align-items: flex-start;
-}
-
-.divider {
+.grade-sep {
     width: 1px;
-    background: #2e2e2e;
-    align-self: stretch;
+    height: 32px;
+    background: var(--border-hi);
 }
 
-.chart-group {
-    flex: 1;
+/* ── Donuts ─────────────────────────────────────────────── */
+.donut-section {
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--border);
 }
 
-.group-label {
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    color: #444;
-    margin-bottom: 10px;
-    text-align: center;
-}
-
-.chart-pair {
+.donut-row {
     display: flex;
-    justify-content: center;
+    align-items: center;
     gap: 16px;
 }
 
-.chart-item {
+.donut-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text);
+    width: 28px;
+}
+
+.donut-pair {
+    display: flex;
+    gap: 16px;
+    flex: 1;
+    justify-content: center;
+}
+
+.donut-item {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
 }
 
-/* Donut with centered text overlay */
-.donut-container {
+.donut-wrap {
     position: relative;
-    width: 120px;
-    height: 120px;
+    width: 80px;
+    height: 80px;
 }
 
-.donut-center {
+.donut-text {
     position: absolute;
     inset: 0;
     display: flex;
@@ -297,54 +279,61 @@ h2 {
     align-items: center;
     justify-content: center;
     pointer-events: none;
-}
-
-.center-count {
-    font-size: 20px;
-    font-weight: 800;
     line-height: 1;
-    color: #e46b09;
 }
 
-.center-total {
-    font-size: 11px;
-    color: #555;
+.dt-val {
+    font-family: var(--font-mono);
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--accent);
 }
 
-.chart-label {
-    font-size: 11px;
-    color: #666;
-    text-align: center;
+.dt-max {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--muted);
 }
 
-/* ── Task summary bar ─────────────────────────────────────── */
-.task-summary {
-    margin-top: 20px;
+.dt-period {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text);
+    letter-spacing: 0.08em;
+}
+
+.donut-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 12px 0;
+}
+
+/* ── Footer ─────────────────────────────────────────────── */
+.card-footer {
+    display: flex;
+    padding: 12px 18px;
+    background: var(--faint);
+}
+
+.stat {
+    flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    align-items: center;
+    gap: 2px;
 }
 
-.summary-bar {
-    height: 4px;
-    background: #2e2e2e;
-    border-radius: 2px;
-    overflow: hidden;
+.stat-val {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
 }
 
-.bar-fill {
-    height: 100%;
-    border-radius: 2px;
-    transition: width 0.4s ease;
-}
-
-.core-fill {
-    background: #e46b09;
-}
-
-.summary-text {
-    font-size: 11px;
-    color: #555;
-    text-align: center;
+.stat-label {
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
 }
 </style>
